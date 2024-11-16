@@ -5,7 +5,12 @@ const { ENV } = require("./constants");
 const { v4: uuid } = require("uuid");
 const { connect } = require("./database");
 const CategoryModel = require("./models/category.model");
-const { callChatGPT, processResponse, formatPrompt } = require("./chatgpt");
+const {
+  callChatGPT,
+  processResponse,
+  formatPrompt,
+  dummyResponse,
+} = require("./chatgpt");
 const Joi = require("joi");
 const { ValidationError } = require("joi");
 const { hashPassword, comparePassword } = require("./utils");
@@ -13,8 +18,15 @@ const UserModel = require("./models/user.model");
 const { checkAuth } = require("./middleware");
 const ActivityModel = require("./models/tasks.model");
 const app = express();
+const cors = require("cors");
 
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 app.get("/", (req, res) =>
   res.status(200).send({
@@ -37,6 +49,7 @@ app.get("/api/generate", checkAuth, async (req, res, next) => {
 
   try {
     const prompt = formatPrompt(value);
+    return res.status(200).send(dummyResponse);
     const result = await callChatGPT(prompt);
     return res
       .status(200)

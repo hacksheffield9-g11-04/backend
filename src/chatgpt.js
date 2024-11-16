@@ -36,4 +36,17 @@ function processResponse(response) {
   return R.compose(R.map(R.trim), R.split("\n"))(response);
 }
 
-module.exports = { callChatGPT, processResponse, formatPrompt };
+const dummyResponse = {
+  activities: [
+    "Wake up and hydrate with a glass of water.",
+    "Spend 10 minutes stretching to improve flexibility.",
+    "Engage in a 15-minute cardio workout like jogging or cycling.",
+    "Dedicate 5 minutes to mindfulness meditation for mental clarity.",
+    "Read a personal development book or listen to a podcast for 10 minutes.",
+    "Journal thoughts and reflections for 5 minutes to enhance self-awareness.",
+  ],
+  original:
+    "Wake up and hydrate with a glass of water.  \nSpend 10 minutes stretching to improve flexibility.  \nEngage in a 15-minute cardio workout like jogging or cycling.  \nDedicate 5 minutes to mindfulness meditation for mental clarity.  \nRead a personal development book or listen to a podcast for 10 minutes.  \nJournal thoughts and reflections for 5 minutes to enhance self-awareness.",
+};
+
+module.exports = { callChatGPT, processResponse, formatPrompt, dummyResponse };
