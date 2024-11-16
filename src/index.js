@@ -245,7 +245,7 @@ app.get("/api/activities/tree", checkAuth, async (req, res, next) => {
       return { startDate, activities: activitiesToday };
     });
 
-    return res.status(200).send({ tag: tagId, graph, dateRange });
+    return res.status(200).send({ tag: tagId, graph });
   } catch (err) {
     return next(err);
   }
