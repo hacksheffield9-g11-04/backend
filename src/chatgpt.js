@@ -1,18 +1,21 @@
-const { Configuration, OpenAIApi } = require("openai");
+const OpenAI = require("openai");
+const { ENV } = require("./constants");
 
-const configuration = new Configuration({
-  apiKey: "your-api-key-here",
+// const configuration = new Configuration({
+//   apiKey: ENV.CHAT_GPT_API_KEY,
+// });
+// const openai = new OpenAIApi(configuration);
+const openai = new OpenAI({
+  apiKey: ENV.CHAT_GPT_API_KEY,
 });
-const openai = new OpenAIApi(configuration);
 
 async function callChatGPT(prompt) {
   try {
-    const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
     });
-
-    return response.data.choices[0].message.content;
+    return response.choices[0]?.message?.content;
   } catch (error) {
     console.error(
       "Error:",

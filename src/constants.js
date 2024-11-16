@@ -1,6 +1,7 @@
 const ENV = {
   PORT: process.env.PORT,
   MONGO_URL: process.env.MONGO_URL,
+  CHAT_GPT_API_KEY: process.env.CHAT_GPT_API_KEY,
 };
 
 const categories = [
