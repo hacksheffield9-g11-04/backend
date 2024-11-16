@@ -14,6 +14,10 @@ const activitySchema = new mongoose.Schema(
       required: true,
       ref: "User",
     },
+    datesCompleted: {
+      type: [Date],
+      default: [],
+    },
   },
   {
     timestamps: true,

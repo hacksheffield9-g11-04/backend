@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const R = require("ramda");
 const jwt = require("jsonwebtoken");
+const moment = require("moment");
 const { ENV } = require("./constants");
 const { v4: uuid } = require("uuid");
 const { connect } = require("./database");
@@ -12,11 +14,17 @@ const {
   dummyResponse,
 } = require("./chatgpt");
 const Joi = require("joi");
+Joi.objectId = require("joi-objectid")(Joi);
 const { ValidationError } = require("joi");
-const { hashPassword, comparePassword } = require("./utils");
+const {
+  hashPassword,
+  comparePassword,
+  hasADateWithinRange,
+  reshapeActivity,
+} = require("./utils");
 const UserModel = require("./models/user.model");
 const { checkAuth } = require("./middleware");
-const ActivityModel = require("./models/tasks.model");
+const ActivityModel = require("./models/activity.model");
 const app = express();
 const cors = require("cors");
 
@@ -62,7 +70,7 @@ app.get("/api/generate", checkAuth, async (req, res, next) => {
 app.get("/api/activities", checkAuth, async (req, res, next) => {
   const { value, error } = Joi.object({
     groupByTag: Joi.boolean().default(true),
-    limit: Joi.number().integer().default(10),
+    limit: Joi.number().integer().default(100),
     skip: Joi.number().integer().default(0),
   }).validate(req.query);
   if (error) return next(error);
@@ -77,7 +85,7 @@ app.get("/api/activities", checkAuth, async (req, res, next) => {
         ActivityModel.find(filter).skip(skip).limit(limit).lean().exec(),
         ActivityModel.find(filter).countDocuments(),
       ]);
-      result = { data, count };
+      result = { data: R.map(reshapeActivity, data), count };
     } else {
       const [{ data, count }] = await ActivityModel.aggregate([
         {
@@ -110,8 +118,8 @@ app.get("/api/activities", checkAuth, async (req, res, next) => {
         },
       ]);
       result = {
-        data: data.map(({ _id, ...data }) => ({
-          ...data,
+        data: data.map(({ _id, activities }) => ({
+          activities: activities.map(reshapeActivity),
           tag: _id,
         })),
         count: count[0]?.count,
@@ -139,6 +147,105 @@ app.post("/api/activities", checkAuth, async (req, res, next) => {
     }));
     const result = await ActivityModel.insertMany(activities);
     return res.status(201).send(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+app.patch(
+  "/api/activities/:_id/toggle-complete",
+  checkAuth,
+  async (req, res, next) => {
+    const { value, error } = Joi.object({
+      _id: Joi.objectId().required(),
+      complete: Joi.boolean().required(),
+    }).validate({ ...req.params, ...req.body });
+    if (error) return next(error);
+
+    const userId = req.user._id;
+    try {
+      const activity = await ActivityModel.findOne({
+        _id: value._id,
+        savedBy: userId,
+      });
+      if (!activity) throw new Error("Activity not found");
+
+      const timestampCompletedToday = hasADateWithinRange(
+        activity.datesCompleted
+      );
+
+      if (!!timestampCompletedToday && value.complete)
+        throw new Error("Already completed");
+
+      if (value.complete) {
+        // Complete the activity by adding today to the list of completed dates
+        activity.datesCompleted.push(moment().utc().toISOString());
+        await activity.save();
+      } else {
+        // Un-complete the activity
+        activity.datesCompleted = activity.datesCompleted.filter(
+          (date) => date !== timestampCompletedToday
+        );
+        await activity.save();
+      }
+
+      return res.status(200).send(activity);
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
+app.get("/api/activities/tree", checkAuth, async (req, res, next) => {
+  const { value, error } = Joi.object({
+    tag: Joi.string(),
+  }).validate({ ...req.query });
+  if (error) return next(error);
+  const userId = req.user._id;
+  const { tag } = value;
+
+  try {
+    const activitiesByTag = await ActivityModel.aggregate([
+      {
+        $match: {
+          savedBy: new mongoose.Types.ObjectId(userId),
+          ...(tag ? { tag } : {}),
+        },
+      },
+      {
+        $group: {
+          _id: "$tag",
+          activities: { $push: "$$ROOT" },
+        },
+      },
+    ]);
+
+    if (activitiesByTag.length === 0) throw new Error("No activity tags found");
+    const { activities, tag: tagId } = activitiesByTag[0];
+    const createdAt = activities[0].createdAt; // all createdAt in same tag are the identical
+
+    // generate date range
+    const startDate = moment(createdAt);
+    const numberOfDays = 21;
+    const dateRange = Array.from({ length: numberOfDays }, (_, i) => {
+      return startDate.clone().add(i, "days").startOf("day");
+    });
+
+    const graph = dateRange.map((startDate) => {
+      const endDate = startDate.clone().add(1, "days");
+      const activitiesToday = [];
+
+      activities.forEach((activity) => {
+        const datesCompleted = activity.datesCompleted;
+        if (hasADateWithinRange(datesCompleted, startDate, endDate)) {
+          activitiesToday.push(R.pick(["_id", "name"])(activity));
+        }
+      });
+
+      return { startDate, activities: activitiesToday };
+    });
+
+    return res.status(200).send({ tag: tagId, graph, dateRange });
   } catch (err) {
     return next(err);
   }
@@ -209,11 +316,10 @@ app.use((err, req, res, next) => {
     return res.status(400).send(err.errorResponse.errmsg);
   }
 
-  console.log(err);
-  return res.status(500).send(err || "Something went wrong");
+  return res.status(500).send(err.message || "Something went wrong");
 });
 
-app.use((req, res, next) => res.status(400).send("Page not found"));
+app.use((req, res, next) => res.status(400).send("Resource not found"));
 
 (async function main() {
   await connect();
