@@ -1,6 +1,8 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const { ENV } = require("./constants");
+const { v4: uuid } = require("uuid");
 const { connect } = require("./database");
 const CategoryModel = require("./models/category.model");
 const { callChatGPT, processResponse, formatPrompt } = require("./chatgpt");
@@ -9,6 +11,7 @@ const { ValidationError } = require("joi");
 const { hashPassword, comparePassword } = require("./utils");
 const UserModel = require("./models/user.model");
 const { checkAuth } = require("./middleware");
+const ActivityModel = require("./models/tasks.model");
 const app = express();
 
 app.use(express.json());
@@ -43,6 +46,92 @@ app.get("/api/generate", checkAuth, async (req, res, next) => {
   }
 });
 
+app.get("/api/activities", checkAuth, async (req, res, next) => {
+  const { value, error } = Joi.object({
+    groupByTag: Joi.boolean().default(true),
+    limit: Joi.number().integer().default(10),
+    skip: Joi.number().integer().default(0),
+  }).validate(req.query);
+  if (error) return next(error);
+  const { groupByTag, skip, limit } = value;
+
+  const userId = req.user._id;
+  try {
+    let result;
+    if (!groupByTag) {
+      const filter = { savedBy: userId };
+      const [data, count] = await Promise.all([
+        ActivityModel.find(filter).skip(skip).limit(limit).lean().exec(),
+        ActivityModel.find(filter).countDocuments(),
+      ]);
+      result = { data, count };
+    } else {
+      const [{ data, count }] = await ActivityModel.aggregate([
+        {
+          $match: {
+            savedBy: new mongoose.Types.ObjectId(userId),
+          },
+        },
+        {
+          $group: {
+            _id: "$tag",
+            activities: { $push: "$$ROOT" },
+          },
+        },
+        {
+          $facet: {
+            data: [
+              {
+                $skip: skip,
+              },
+              {
+                $limit: limit,
+              },
+            ],
+            count: [
+              {
+                $count: "count",
+              },
+            ],
+          },
+        },
+      ]);
+      result = {
+        data: data.map(({ _id, ...data }) => ({
+          ...data,
+          tag: _id,
+        })),
+        count: count[0]?.count,
+      };
+    }
+    return res.status(200).send(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+app.post("/api/activities", checkAuth, async (req, res, next) => {
+  const { value, error } = Joi.object({
+    activities: Joi.array().items(Joi.string()).min(1).required(),
+  }).validate(req.body);
+  if (error) return next(error);
+
+  const userId = req.user._id;
+  const tag = uuid();
+  try {
+    const activities = value.activities.map((activity) => ({
+      name: activity,
+      tag,
+      savedBy: userId,
+    }));
+    const result = await ActivityModel.insertMany(activities);
+    return res.status(201).send(result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+// Auth
 app.post("/api/register", async (req, res, next) => {
   const { value, error } = Joi.object({
     name: Joi.string().min(4).required(),
@@ -107,8 +196,10 @@ app.use((err, req, res, next) => {
     return res.status(400).send(err.errorResponse.errmsg);
   }
 
+  console.log(err);
   return res.status(500).send(err || "Something went wrong");
 });
+
 app.use((req, res, next) => res.status(400).send("Page not found"));
 
 (async function main() {
