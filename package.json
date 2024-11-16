@@ -13,6 +13,7 @@
   "dependencies": {
     "express": "^4.21.1",
     "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.1",
     "openai": "^4.72.0",
     "ramda": "^0.30.1"
