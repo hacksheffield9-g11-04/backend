@@ -1,10 +1,7 @@
 const OpenAI = require("openai");
+const R = require("ramda");
 const { ENV } = require("./constants");
 
-// const configuration = new Configuration({
-//   apiKey: ENV.CHAT_GPT_API_KEY,
-// });
-// const openai = new OpenAIApi(configuration);
 const openai = new OpenAI({
   apiKey: ENV.CHAT_GPT_API_KEY,
 });
@@ -24,4 +21,19 @@ async function callChatGPT(prompt) {
   }
 }
 
-module.exports = { callChatGPT };
+function formatPrompt(queries) {
+  const { category, difficulty, durationPerDay } = queries;
+  const prompt = `Please give me a concise daily routine for personal growth with the following properties
+  - ${category}
+  - ${durationPerDay} minutes per day
+  - ${difficulty} difficulty
+  - one line per activity
+  - no title`;
+  return prompt;
+}
+
+function processResponse(response) {
+  return R.compose(R.map(R.trim), R.split("\n"))(response);
+}
+
+module.exports = { callChatGPT, processResponse, formatPrompt };
