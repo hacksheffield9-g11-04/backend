@@ -12,6 +12,8 @@ const {
   processResponse,
   formatPrompt,
   dummyResponse,
+  cacheGPTResponse,
+  getRandomFromCache,
 } = require("./chatgpt");
 const Joi = require("joi");
 Joi.objectId = require("joi-objectid")(Joi);
@@ -56,12 +58,18 @@ app.get("/api/generate", checkAuth, async (req, res, next) => {
   if (error) return next(error);
 
   try {
+    const FROM_CACHE = false;
+    if (FROM_CACHE) {
+      const activities = await getRandomFromCache(value);
+      return res.status(200).send({ activities });
+    }
+
     const prompt = formatPrompt(value);
-    return res.status(200).send(dummyResponse);
+    // return res.status(200).send(dummyResponse);
     const result = await callChatGPT(prompt);
-    return res
-      .status(200)
-      .send({ activities: processResponse(result), original: result });
+    const activities = processResponse(result);
+    await cacheGPTResponse(value, activities);
+    return res.status(200).send({ activities, original: result });
   } catch (err) {
     return next(err);
   }
