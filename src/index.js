@@ -70,7 +70,7 @@ app.get("/api/generate", checkAuth, async (req, res, next) => {
     const result = await callChatGPT(prompt);
     const activities = processResponse(result);
     await cacheGPTResponse(value, activities);
-    return res.status(200).send({ activities, original: result });
+    return res.status(200).send({ activities, original: result, prompt });
   } catch (err) {
     return next(err);
   }
