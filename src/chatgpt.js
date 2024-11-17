@@ -11,7 +11,7 @@ const openai = new OpenAI({
 async function callChatGPT(prompt) {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: [{ role: "user", content: prompt }],
     });
     return response.choices[0]?.message?.content;
@@ -26,9 +26,7 @@ async function callChatGPT(prompt) {
 function formatPrompt(queries) {
   const { category, subcategory, difficulty, durationPerDay } = queries;
   const prompt = `Please give me a concise daily routine for personal growth with the following properties
-  - ${
-    category == "mind" ? "mindfulness" : category
-  } with focus on ${subcategory}
+  - ${subcategory}
   - ${durationPerDay} minutes per day
   - ${difficulty} difficulty
   - one line per activity
@@ -43,7 +41,7 @@ function processResponse(response) {
       !isNaN(line.charAt(0)) &&
       (line.charAt(1) === "." || line.charAt(1) === " ")
     ) {
-      line = line.slice(1).trim();
+      line = line.slice(2).trim();
     } else if (line.charAt(0) === "-") {
       line = line.slice(1).trim();
     }
@@ -53,7 +51,7 @@ function processResponse(response) {
 }
 
 async function getRandomFromCache(queries) {
-  const { category, subcategory, difficulty, durationPerDay } = queries;
+  const { category = "", subcategory, difficulty, durationPerDay } = queries;
   // category + difficulty + durationPerDay
   const key = `${category}${subcategory}${difficulty}${durationPerDay}`;
 
@@ -62,7 +60,7 @@ async function getRandomFromCache(queries) {
 }
 
 async function cacheGPTResponse(queries, activities) {
-  const { category, subcategory, difficulty, durationPerDay } = queries;
+  const { category = "", subcategory, difficulty, durationPerDay } = queries;
   // category + difficulty + durationPerDay
   const key = `${category}${subcategory}${difficulty}${durationPerDay}`;
 
