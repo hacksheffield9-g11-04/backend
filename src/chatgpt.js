@@ -26,8 +26,9 @@ async function callChatGPT(prompt) {
 function formatPrompt(queries) {
   const { category, subcategory, difficulty, durationPerDay } = queries;
   const prompt = `Please give me a concise daily routine for personal growth with the following properties
-  - ${category} 
-  - ${subcategory}
+  - ${
+    category == "mind" ? "mindfulness" : category
+  } with focus on ${subcategory}
   - ${durationPerDay} minutes per day
   - ${difficulty} difficulty
   - one line per activity
