@@ -24,9 +24,10 @@ async function callChatGPT(prompt) {
 }
 
 function formatPrompt(queries) {
-  const { category, difficulty, durationPerDay } = queries;
+  const { category, subcategory, difficulty, durationPerDay } = queries;
   const prompt = `Please give me a concise daily routine for personal growth with the following properties
-  - ${category}
+  - ${category} 
+  - ${subcategory}
   - ${durationPerDay} minutes per day
   - ${difficulty} difficulty
   - one line per activity
@@ -51,18 +52,18 @@ function processResponse(response) {
 }
 
 async function getRandomFromCache(queries) {
-  const { category, difficulty, durationPerDay } = queries;
+  const { category, subcategory, difficulty, durationPerDay } = queries;
   // category + difficulty + durationPerDay
-  const key = `${category}${difficulty}${durationPerDay}`;
+  const key = `${category}${subcategory}${difficulty}${durationPerDay}`;
 
   const caches = await CacheModel.find({ key }).limit(0).lean().exec(); // return all docs for now
   return _.shuffle(caches)[0];
 }
 
 async function cacheGPTResponse(queries, activities) {
-  const { category, difficulty, durationPerDay } = queries;
+  const { category, subcategory, difficulty, durationPerDay } = queries;
   // category + difficulty + durationPerDay
-  const key = `${category}${difficulty}${durationPerDay}`;
+  const key = `${category}${subcategory}${difficulty}${durationPerDay}`;
 
   const cache = new CacheModel({
     key,

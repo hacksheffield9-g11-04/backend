@@ -52,6 +52,7 @@ app.get("/api/home", async (req, res) => {
 app.get("/api/generate", checkAuth, async (req, res, next) => {
   const { value, error } = Joi.object({
     category: Joi.string().valid("fitness", "mind", "knowledge").required(),
+    subcategory: Joi.string().max(100),
     difficulty: Joi.string().valid("easy", "medium", "hard").required(),
     durationPerDay: Joi.number().integer().min(1).max(180).required(),
   }).validate(req.query);
